@@ -5,14 +5,15 @@
 #include "Particle.h"
 #line 1 "/Users/jessicamacbookpro/Documents/IoT/Capstone-SIDS-Monitor/Capstone_Project_SIDS_Monitor/src/Capstone_Project_SIDS_Monitor.ino"
 /*
- * Project Capstone_Project_SIDS_Monitor
- * Description:
- * Author:Jessica Rodriquez
- * Date:
+ * Project: Capstone_Project_SIDS_Monitor
+ * Description: Smart baby monitor to help prevent SIDS
+ * Author: Jessica Rodriquez
+ * Date: 11/29/2021
  */
 
 void setup();
 void loop();
+void lowbreathrate();
 #line 8 "/Users/jessicamacbookpro/Documents/IoT/Capstone-SIDS-Monitor/Capstone_Project_SIDS_Monitor/src/Capstone_Project_SIDS_Monitor.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC)
 
@@ -24,6 +25,8 @@ String DateTime, TimeOnly;
 # define BUTTONPIN D2
 
 int buttonpress;
+unsigned int frequency = 396;
+unsigned long duration = 1000;
 
 Adafruit_SSD1306 display(OLED_RESET);
 
@@ -39,7 +42,6 @@ void setup() {
   display.clearDisplay();
   display.drawPixel(10, 10, WHITE);
   display.display();
-  //delay(2000);
   display.clearDisplay();
 
 pinMode(BUTTONPIN,INPUT);
@@ -55,10 +57,22 @@ void loop() {
   display.setCursor(0,0);             // Start at top-left corner
   display.setTextColor(BLACK,WHITE); // Draw 'inverse' text
   display.display();
-  //delay(2000);
+ 
 
   buttonpress=digitalRead(BUTTONPIN);
   if (buttonpress) {
    Serial.println("Button is pressed");
   }
+
+  if(lowbreathrate) {
+    tone(2, frequency, duration);
+  }
+else {
+  noTone(2);
+}
+
+}
+
+void lowbreathrate() {
+  
 }
