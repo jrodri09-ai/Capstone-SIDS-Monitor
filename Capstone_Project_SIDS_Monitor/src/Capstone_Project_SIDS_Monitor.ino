@@ -13,8 +13,11 @@ SYSTEM_MODE(SEMI_AUTOMATIC)
 #include "Adafruit_MQTT/Adafruit_MQTT.h" 
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 #include "math.h"
+#include "IoTTimer.h"
 
 String DateTime, TimeOnly;
+
+IoTTimer Timer; 
 
 #define OLED_RESET  D4 
 #define BUTTONPIN D2
@@ -22,7 +25,7 @@ String DateTime, TimeOnly;
 
 int buttonpress;
 int resistance;
-int breaths;
+static int breaths;
 
 unsigned int frequency = 396;
 unsigned long duration = 1000;
@@ -39,6 +42,8 @@ Adafruit_MQTT_Publish mqttObjRes = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/f
 
 void setup() {
   Serial.begin(9600);
+
+  Timer.startTimer(15000);
 
   WiFi.connect();
   while(WiFi.connecting()) {
@@ -63,7 +68,7 @@ pinMode(THREADPIN,INPUT);
 
 void loop() {
    // Validate connected to MQTT Broker
-  MQTT_connect();
+  //MQTT_connect();
 
   DateTime = Time.timeStr();
   TimeOnly = DateTime.substring(11,19);
@@ -101,28 +106,19 @@ delay(500);
   }
 
 
-breaths=0;
-while(millis()-lastMin < 6000) {
-  resistance = analogRead(THREADPIN);
-  if (resistance <2000) {
-    current=resistance;
-  }
-  if(resistance>=2000) {
-    last=resistance;
-  }
+  current = analogRead(THREADPIN);
   if((current<2000)&&(last>2000)) {
-    Serial.printf("BPM=%i\n",breaths);
-    Serial.printf("current%i",current);
-    Serial.printf("last%i",last);
     breaths++;
-    current=9999;
-    last=0;
   }
-  
+  last = current;
+
+  if(Timer.isTimerReady()){
+
+ 
+Serial.printf("Breaths per 15 seconds=%i\n",breaths);
+breaths=0;
+Timer.startTimer(15000);
 }
-lastMin = millis();
-Serial.printf("BPM=%i\n",breaths);
-delay(500);
 }
 
 void lowbreathrate() {
@@ -131,22 +127,22 @@ void lowbreathrate() {
 
 
 
-// Function to connect and reconnect as necessary to the MQTT server.
-void MQTT_connect() {
-  int8_t ret;
+// // Function to connect and reconnect as necessary to the MQTT server.
+// void MQTT_connect() {
+//   int8_t ret;
  
-  // Stop if already connected.
-  if (mqtt.connected()) {
-    return;
-  }
+//   // Stop if already connected.
+//   if (mqtt.connected()) {
+//     return;
+//   }
  
-  Serial.print("Connecting to MQTT... ");
+//   Serial.print("Connecting to MQTT... ");
  
-  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
-       Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
-       Serial.printf("Retrying MQTT connection in 5 seconds..\n");
-       mqtt.disconnect();
-       delay(5000);  // wait 5 seconds
-  }
-  Serial.printf("MQTT Connected!\n");
-}
+//   while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+//        Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
+//        Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+//        mqtt.disconnect();
+//        delay(5000);  // wait 5 seconds
+//   }
+//   Serial.printf("MQTT Connected!\n");
+// }
