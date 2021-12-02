@@ -24,35 +24,39 @@ SYSTEM_MODE(SEMI_AUTOMATIC)
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 #include "math.h"
 #include "IoTTimer.h"
+#include <Stepper.h>
+
 
 String DateTime, TimeOnly;
 
 IoTTimer Timer; 
 
+
 #define OLED_RESET  D4 
 #define BUTTONPIN D2
-#define THREADPIN A2
+#define THREADPIN A5
 
 int buttonpress;
 int resistance;
 static int breaths;
+const int stepsPerRevolution = 1024;
 
 unsigned int frequency = 396;
 unsigned long duration = 1000;
 unsigned long last, lastTime, lastMin, current;
 
 Adafruit_SSD1306 display(OLED_RESET);
-
 TCPClient TheClient; 
-
 Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY);
-
-
 Adafruit_MQTT_Publish mqttObjRes = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/resistance");
+Stepper myStepper(stepsPerRevolution, A1, A3, A2, A4);
+
 
 void setup() {
   Serial.begin(9600);
-
+// set the speed at 60 rpm:
+  myStepper.setSpeed(15);
+  
   Timer.startTimer(15000);
 
   WiFi.connect();
@@ -129,7 +133,18 @@ Serial.printf("Breaths per 15 seconds=%i\n",breaths);
 breaths=0;
 Timer.startTimer(15000);
 }
+
+Serial.println("clockwise");
+  myStepper.step(-stepsPerRevolution);
+  delay(500);
+
+  // step one revolution in the other direction:
+  Serial.println("counterclockwise");
+  myStepper.step(stepsPerRevolution);
+  delay(500);
 }
+
+
 
 void lowbreathrate() {
   
