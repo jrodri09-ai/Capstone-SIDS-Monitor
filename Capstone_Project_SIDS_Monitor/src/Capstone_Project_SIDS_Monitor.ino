@@ -14,7 +14,7 @@ SYSTEM_MODE(SEMI_AUTOMATIC)
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h"
 #include "math.h"
 #include "IoTTimer.h"
-#include <Stepper.h>
+#include "Stepper.h"
 
 
 String DateTime, TimeOnly;
@@ -29,7 +29,8 @@ IoTTimer Timer;
 int buttonpress;
 int resistance;
 static int breaths;
-const int stepsPerRevolution = 1024;
+const int stepsPerRevolution =2048;
+
 
 unsigned int frequency = 396;
 unsigned long duration = 1000;
@@ -45,7 +46,7 @@ Stepper myStepper(stepsPerRevolution, A1, A3, A2, A4);
 void setup() {
   Serial.begin(9600);
 // set the speed at 60 rpm:
-  myStepper.setSpeed(15);
+  myStepper.setSpeed(12);
   
   Timer.startTimer(15000);
 
@@ -126,12 +127,6 @@ Timer.startTimer(15000);
 
 Serial.println("clockwise");
   myStepper.step(-stepsPerRevolution);
-  delay(500);
-
-  // step one revolution in the other direction:
-  Serial.println("counterclockwise");
-  myStepper.step(stepsPerRevolution);
-  delay(500);
 }
 
 
