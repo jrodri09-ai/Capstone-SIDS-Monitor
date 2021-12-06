@@ -28,6 +28,7 @@ void vibeOff();
 void MQTT_connect();
 #line 8 "/Users/jessicamacbookpro/Documents/IoT/Capstone-SIDS-Monitor/Capstone_Project_SIDS_Monitor/src/Capstone_Project_SIDS_Monitor.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC)
+SYSTEM_THREAD(ENABLED)
 
 #include <Adafruit_SSD1306.h>
 #include "credentials.h"
@@ -113,9 +114,6 @@ void loop()
   sampleHeartRate();
   soundAlarm();
   rockCrib();
-  vibeOn();
-  delay(1000);
-  vibeOff();
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
 }
 

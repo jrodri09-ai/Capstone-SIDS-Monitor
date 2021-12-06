@@ -6,6 +6,7 @@
  */
 
 SYSTEM_MODE(SEMI_AUTOMATIC)
+SYSTEM_THREAD(ENABLED)
 
 #include <Adafruit_SSD1306.h>
 #include "credentials.h"
@@ -89,11 +90,8 @@ void loop()
   }
   findBreaths();
   sampleHeartRate();
-  soundAlarm();
   rockCrib();
-  vibeOn();
-  delay(1000);
-  vibeOff();
+  soundAlarm();
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
 }
 
@@ -233,16 +231,14 @@ int sampleHeartRate() {
 }
 
 void rockCrib() {
-  // wrap in if statment
+  //if( 15 sec after vibe no breath is detected ){
   Serial.println("clockwise");
   myStepper.step(-stepsPerRevolution);
+  //}
 }
 
 void soundAlarm() {
   if (lowbreathrate()) {//check if low heart rate and breaths ex: if(sampleHeartRate() < 65 || findBreaths < 30) 
-    vibeOn();
-    delay(1000);
-    vibeOff();
     tone(2, frequency, duration);
   } else {
     noTone(2);
@@ -254,8 +250,10 @@ bool lowbreathrate() {
 }
 
 void vibeOn() {
+  if(lowbreathrate) {
   digitalWrite(VIBEPIN, HIGH);
   Serial.printf("Vibe on\n");
+  }
 }
 
 void vibeOff() {
