@@ -18,13 +18,14 @@ void setupPins();
 void startSpo2();
 void startWifi();
 void displayTime();
-void findBreaths();
-void sampleHeartRate();
+int findBreaths();
+int sampleHeartRate();
 void rockCrib();
 void soundAlarm();
 bool lowbreathrate();
 void vibeOn();
 void vibeOff();
+void MQTT_connect();
 #line 8 "/Users/jessicamacbookpro/Documents/IoT/Capstone-SIDS-Monitor/Capstone_Project_SIDS_Monitor/src/Capstone_Project_SIDS_Monitor.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC)
 
@@ -90,8 +91,8 @@ void setup()
   // set the speed at 60 rpm:
   setupPins();
   myStepper.setSpeed(12);
-  // startWifi();
-  // startDisplay();
+  startWifi();
+  startDisplay();
   Timer.startTimer(15000);
   // Initialize sensor
   startSpo2();
@@ -100,25 +101,22 @@ void setup()
 void loop()
 {
   // Validate connected to MQTT Broker
-  // MQTT_connect();
-  // displayTime();
+  MQTT_connect();
+  displayTime();
 
   buttonpress = digitalRead(BUTTONPIN);
   if (buttonpress)
   {
     Serial.println("Button is pressed");
   }
-  // soundAlarm();
-  // findBreaths();
-  // rockCrib();
-  //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
-  // sampleHeartRate();
-
+  findBreaths();
+  sampleHeartRate();
+  soundAlarm();
+  rockCrib();
   vibeOn();
-  Serial.printf("Vibe on\n");
   delay(1000);
   vibeOff();
-  Serial.printf("Vibe off\n");
+  //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
 }
 
 void startDisplay()
@@ -177,19 +175,16 @@ void startSpo2()
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
 }
 
-void startWifi()
-{
+void startWifi() {
   WiFi.connect();
-  while (WiFi.connecting())
-  {
-    Serial.printf("connecting");
+  while (WiFi.connecting()) {
+    //Serial.printf("connecting");
   }
   Time.zone(-7);
   Particle.syncTime();
 }
 
-void displayTime()
-{
+void displayTime() {
   DateTime = Time.timeStr();
   TimeOnly = DateTime.substring(11, 19);
   display.printf("Time is %s\n", TimeOnly.c_str());
@@ -200,54 +195,47 @@ void displayTime()
   display.display();
 }
 
-void findBreaths()
-{
+int findBreaths() {
   resistance = analogRead(THREADPIN);
   Serial.printf("Resistance=%i\n", resistance);
   delay(500);
 
-  // //publish to cloud every 6 seconds
-  //   if((millis()-lastTime > 6000)) {
-  //     if (mqtt.Update()) {
-  //       //mqttObjRes.publish();
-  //       //Serial.printf("Publishing %f\n",mqttObjRes);
-  //     }
-  //     lastTime = millis();
-  //   }
+  //publish to cloud every 6 seconds
+  if ((millis() - lastTime > 6000)) {
+    if (mqtt.Update()) {
+      mqttObjRes.publish(breaths);
+      Serial.printf("Publishing %f\n", mqttObjRes);
+    }
+    lastTime = millis();
+  }
 
   current = analogRead(THREADPIN);
-  if ((current < 2000) && (last > 2000))
-  {
+  if ((current < 2000) && (last > 2000)) {
     breaths++;
   }
   last = current;
 
-  if (Timer.isTimerReady())
-  {
-
-    Serial.printf("Breaths per 15 seconds=%i\n", breaths);
+  if (Timer.isTimerReady()) { Serial.printf("Breaths per 15 seconds=%i\n", breaths);
     breaths = 0;
     Timer.startTimer(15000);
   }
+  return breaths;
 }
 
-void sampleHeartRate()
-{
+int sampleHeartRate() {
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
 
   delay(100); // allow the code to pause for a moment
   //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
-  for (byte i = 25; i < 100; i++)
-  {
+  for (byte i = 25; i < 100; i++) {
     redBuffer[i - 25] = redBuffer[i];
     irBuffer[i - 25] = irBuffer[i];
   }
 
   //take 25 sets of samples before calculating the heart rate.
-  for (byte i = 75; i < 100; i++)
-  {
-    while (particleSensor.available() == false)
-    {                         //do we have new data?
+  for (byte i = 75; i < 100; i++) {
+    while (particleSensor.available() == false) {
+                               //do we have new data?
       particleSensor.check(); //Check the sensor for new data
     }
     digitalWrite(readLED, !digitalRead(readLED)); //Blink onboard LED with every data read
@@ -257,64 +245,59 @@ void sampleHeartRate()
     particleSensor.nextSample(); //We're finished with this sample so move to next sample
 
     //send samples and calculation result to terminal program through UART
-    if (((validHeartRate == 1) || (validSPO2 == 1)) && (i == 99))
-    {
+    if (((validHeartRate == 1) || (validSPO2 == 1)) && (i == 99)) {
       Serial.printf("red = %i, ir = %i, HR = %i, HRvalid = %i, sp02 = %i, SPO2valid = %i \n", redBuffer[i], irBuffer[i], heartRate, validHeartRate, spo2, validSPO2);
     }
   }
   //After gathering 25 new samples recalculate HR and SP02
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+  return heartRate;
 }
 
-void rockCrib()
-{
+void rockCrib() {
+  // wrap in if statment
   Serial.println("clockwise");
   myStepper.step(-stepsPerRevolution);
 }
 
-void soundAlarm()
-{
-  if (lowbreathrate())
-  {
+void soundAlarm() {
+  if (lowbreathrate()) {//check if low heart rate and breaths ex: if(sampleHeartRate() < 65 || findBreaths < 30) 
+    vibeOn();
+    delay(1000);
+    vibeOff();
     tone(2, frequency, duration);
-  }
-  else
-  {
+  } else {
     noTone(2);
   }
 }
 
-bool lowbreathrate()
-{
+bool lowbreathrate() {
   return false;
 }
 
-void vibeOn()
-{
+void vibeOn() {
   digitalWrite(VIBEPIN, HIGH);
+  Serial.printf("Vibe on\n");
 }
 
-void vibeOff()
-{
+void vibeOff() {
   digitalWrite(VIBEPIN, LOW);
+  Serial.printf("Vibe off\n");
 }
 
 // Function to connect and reconnect as necessary to the MQTT server.
-// void MQTT_connect()
-// {
-//   int8_t ret;
-//   // Stop if already connected.
-//   if (mqtt.connected())
-//   {
-//     return;
-//   }
-//   Serial.print("Connecting to MQTT... ");
-//   while ((ret = mqtt.connect()) != 0)
-//   { // connect will return 0 for connected
-//     Serial.printf("%s\n", (char *)mqtt.connectErrorString(ret));
-//     Serial.printf("Retrying MQTT connection in 5 seconds..\n");
-//     mqtt.disconnect();
-//     delay(5000); // wait 5 seconds
-//   }
-//   Serial.printf("MQTT Connected!\n");
-// }
+void MQTT_connect() {
+  int8_t ret;
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+  Serial.print("Connecting to MQTT... ");
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+    Serial.printf("%s\n", (char *)mqtt.connectErrorString(ret));
+    Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+    mqtt.disconnect();
+    delay(5000); // wait 5 seconds
+  }
+  Serial.printf("MQTT Connected!\n");
+}
