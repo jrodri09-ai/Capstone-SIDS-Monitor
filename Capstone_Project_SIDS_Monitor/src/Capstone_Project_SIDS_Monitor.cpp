@@ -201,18 +201,6 @@ void startSpo2()
 
   //calculate heart rate and SpO2 after first 100 samples (first 4 seconds of samples)
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
-      display.clearDisplay();
-      display.setCursor(0,0);
-      display.printf("spo2= %i",spo2);
-      display.display();
-       //publish sp02 to cloud every 30 seconds
-  if((millis()-lastTime > 30000)) {
-    if (mqtt.Update()) {
-      mqttSPO2.publish(spo2);
-      Serial.printf("SP02 = %i\n",spo2);
-    }
-    lastTimeSpo2 = millis();
-  }
 }
 
 void startWifi() {
@@ -300,6 +288,18 @@ int sampleHeartRate() {
       Serial.printf("heart rate = %i\n",heartRate);
     }
     lastTimeHeartRate = millis();
+  }
+   display.clearDisplay();
+      display.setCursor(0,0);
+      display.printf("spo2= %i",spo2);
+      display.display();
+       //publish sp02 to cloud every 30 seconds
+  if((millis()-lastTimeSpo2 > 30000)) {
+    if (mqtt.Update()) {
+      mqttSPO2.publish(spo2);
+      Serial.printf("SP02 = %i\n",spo2);
+    }
+    lastTimeSpo2 = millis();
   }
   return heartRate;
 }
