@@ -122,6 +122,15 @@ void loop()
   if (timeAfterRock.isTimerReady() && findBreaths() < 5 && isCribRocking) {
    soundAlarm();
   }
+  //publish heartrate to cloud every 6 seconds
+  if((millis()-lastTime > 6000)) {
+    if (mqtt.Update()) {
+      mqttHeartRate.publish(heartRate);
+      Serial.printf("heart rate = %i\n",heartRate);
+    }
+    lastTime = millis();
+  }
+
 }
 
 void startDisplay()
