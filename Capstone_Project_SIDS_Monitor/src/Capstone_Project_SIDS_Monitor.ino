@@ -47,11 +47,17 @@ byte pulseLED = 11;      //Must be on PWM pin
 byte readLED = D7;       //Blinks with each data read
 
 unsigned int frequency = 396;
-unsigned long duration = 1000;
+unsigned long duration = 500;
 unsigned long last, lastTime, lastMin, current;
+
+bool alarmRised = false;
+bool isLowBreathRate = false;
+bool isCribRocking = false;
 
 // Timers
 IoTTimer Timer;
+IoTTimer timeAfterVibe;
+IoTTimer timeAfterRock;
 // HeartRate
 MAX30105 particleSensor;
 // OLED
@@ -67,8 +73,8 @@ void setup()
 {
   Serial.begin(115200); // initialize serial communication at 115200 bits per second:
   waitFor(Serial.isConnected, 3000);
-  // set the speed at 60 rpm:
   setupPins();
+  // set the speed at 60 rpm:
   myStepper.setSpeed(12);
   startWifi();
   startDisplay();
@@ -84,15 +90,32 @@ void loop()
   displayTime();
 
   buttonpress = digitalRead(BUTTONPIN);
-  if (buttonpress)
+  if (buttonpress && alarmRised)
   {
+    sendText();
     Serial.println("Button is pressed");
   }
+
   findBreaths();
   sampleHeartRate();
-  rockCrib();
-  soundAlarm();
-  //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
+
+  vibeOn();
+  while(!timeAfterVibe.isTimerReady() && isLowBreathRate) {
+   findBreaths();
+   sampleHeartRate();
+  }
+  if (timeAfterVibe.isTimerReady() && findBreaths() < 5) {
+   rockCrib();
+    while(!timeAfterRock.isTimerReady()) {
+      findBreaths();
+      sampleHeartRate();
+    } 
+  } else {
+    isCribRocking = false;
+  }
+  if (timeAfterRock.isTimerReady() && findBreaths() < 5 && isCribRocking) {
+   soundAlarm();
+  }
 }
 
 void startDisplay()
@@ -174,8 +197,12 @@ void displayTime() {
 int findBreaths() {
   resistance = analogRead(THREADPIN);
   Serial.printf("Resistance=%i\n", resistance);
-  delay(500);
-
+  // delay(500);
+  current = analogRead(THREADPIN);
+  if ((current < 2000) && (last > 2000)) {
+    breaths++;
+  }
+  last = current;
   //publish to cloud every 6 seconds
   if ((millis() - lastTime > 6000)) {
     if (mqtt.Update()) {
@@ -184,13 +211,6 @@ int findBreaths() {
     }
     lastTime = millis();
   }
-
-  current = analogRead(THREADPIN);
-  if ((current < 2000) && (last > 2000)) {
-    breaths++;
-  }
-  last = current;
-
   if (Timer.isTimerReady()) { Serial.printf("Breaths per 15 seconds=%i\n", breaths);
     breaths = 0;
     Timer.startTimer(15000);
@@ -230,35 +250,34 @@ int sampleHeartRate() {
   return heartRate;
 }
 
+void vibeOn() {
+  if(findBreaths()<=5) {
+    digitalWrite(VIBEPIN, HIGH);
+    Serial.printf("Vibe on\n");
+    delay(1000);
+    digitalWrite(VIBEPIN, LOW);
+    Serial.printf("Vibe off\n");
+    timeAfterVibe.startTimer(15000);
+    isLowBreathRate = true;
+  } else {
+    isLowBreathRate = false;
+  }
+}
+
 void rockCrib() {
-  //if( 15 sec after vibe no breath is detected ){
   Serial.println("clockwise");
   myStepper.step(-stepsPerRevolution);
-  //}
+  timeAfterRock.startTimer(15000);
+  isCribRocking = true;
 }
 
 void soundAlarm() {
-  if (lowbreathrate()) {//check if low heart rate and breaths ex: if(sampleHeartRate() < 65 || findBreaths < 30) 
     tone(2, frequency, duration);
-  } else {
-    noTone(2);
-  }
+    alarmRised = true; 
 }
 
-bool lowbreathrate() {
-  return false;
-}
-
-void vibeOn() {
-  if(lowbreathrate) {
-  digitalWrite(VIBEPIN, HIGH);
-  Serial.printf("Vibe on\n");
-  }
-}
-
-void vibeOff() {
-  digitalWrite(VIBEPIN, LOW);
-  Serial.printf("Vibe off\n");
+void sendText() {
+  // TODO find how to send a text
 }
 
 // Function to connect and reconnect as necessary to the MQTT server.

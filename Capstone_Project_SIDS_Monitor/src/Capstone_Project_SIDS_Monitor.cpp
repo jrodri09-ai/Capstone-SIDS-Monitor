@@ -20,11 +20,10 @@ void startWifi();
 void displayTime();
 int findBreaths();
 int sampleHeartRate();
+void vibeOn();
 void rockCrib();
 void soundAlarm();
-bool lowbreathrate();
-void vibeOn();
-void vibeOff();
+void sendText();
 void MQTT_connect();
 #line 8 "/Users/jessicamacbookpro/Documents/IoT/Capstone-SIDS-Monitor/Capstone_Project_SIDS_Monitor/src/Capstone_Project_SIDS_Monitor.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC)
@@ -69,11 +68,17 @@ byte pulseLED = 11;      //Must be on PWM pin
 byte readLED = D7;       //Blinks with each data read
 
 unsigned int frequency = 396;
-unsigned long duration = 1000;
+unsigned long duration = 500;
 unsigned long last, lastTime, lastMin, current;
+
+bool alarmRised = false;
+bool isLowBreathRate = false;
+bool isCribRocking = false;
 
 // Timers
 IoTTimer Timer;
+IoTTimer timeAfterVibe;
+IoTTimer timeAfterRock;
 // HeartRate
 MAX30105 particleSensor;
 // OLED
@@ -89,8 +94,8 @@ void setup()
 {
   Serial.begin(115200); // initialize serial communication at 115200 bits per second:
   waitFor(Serial.isConnected, 3000);
-  // set the speed at 60 rpm:
   setupPins();
+  // set the speed at 60 rpm:
   myStepper.setSpeed(12);
   startWifi();
   startDisplay();
@@ -106,15 +111,32 @@ void loop()
   displayTime();
 
   buttonpress = digitalRead(BUTTONPIN);
-  if (buttonpress)
+  if (buttonpress && alarmRised)
   {
+    sendText();
     Serial.println("Button is pressed");
   }
+
   findBreaths();
   sampleHeartRate();
-  soundAlarm();
-  rockCrib();
-  //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
+
+  vibeOn();
+  while(!timeAfterVibe.isTimerReady() && isLowBreathRate) {
+   findBreaths();
+   sampleHeartRate();
+  }
+  if (timeAfterVibe.isTimerReady() && findBreaths() < 5) {
+   rockCrib();
+    while(!timeAfterRock.isTimerReady()) {
+      findBreaths();
+      sampleHeartRate();
+    } 
+  } else {
+    isCribRocking = false;
+  }
+  if (timeAfterRock.isTimerReady() && findBreaths() < 5 && isCribRocking) {
+   soundAlarm();
+  }
 }
 
 void startDisplay()
@@ -196,8 +218,12 @@ void displayTime() {
 int findBreaths() {
   resistance = analogRead(THREADPIN);
   Serial.printf("Resistance=%i\n", resistance);
-  delay(500);
-
+  // delay(500);
+  current = analogRead(THREADPIN);
+  if ((current < 2000) && (last > 2000)) {
+    breaths++;
+  }
+  last = current;
   //publish to cloud every 6 seconds
   if ((millis() - lastTime > 6000)) {
     if (mqtt.Update()) {
@@ -206,13 +232,6 @@ int findBreaths() {
     }
     lastTime = millis();
   }
-
-  current = analogRead(THREADPIN);
-  if ((current < 2000) && (last > 2000)) {
-    breaths++;
-  }
-  last = current;
-
   if (Timer.isTimerReady()) { Serial.printf("Breaths per 15 seconds=%i\n", breaths);
     breaths = 0;
     Timer.startTimer(15000);
@@ -252,35 +271,34 @@ int sampleHeartRate() {
   return heartRate;
 }
 
-void rockCrib() {
-  // wrap in if statment
-  Serial.println("clockwise");
-  myStepper.step(-stepsPerRevolution);
-}
-
-void soundAlarm() {
-  if (lowbreathrate()) {//check if low heart rate and breaths ex: if(sampleHeartRate() < 65 || findBreaths < 30) 
-    vibeOn();
+void vibeOn() {
+  if(findBreaths()<=5) {
+    digitalWrite(VIBEPIN, HIGH);
+    Serial.printf("Vibe on\n");
     delay(1000);
-    vibeOff();
-    tone(2, frequency, duration);
+    digitalWrite(VIBEPIN, LOW);
+    Serial.printf("Vibe off\n");
+    timeAfterVibe.startTimer(15000);
+    isLowBreathRate = true;
   } else {
-    noTone(2);
+    isLowBreathRate = false;
   }
 }
 
-bool lowbreathrate() {
-  return false;
+void rockCrib() {
+  Serial.println("clockwise");
+  myStepper.step(-stepsPerRevolution);
+  timeAfterRock.startTimer(15000);
+  isCribRocking = true;
 }
 
-void vibeOn() {
-  digitalWrite(VIBEPIN, HIGH);
-  Serial.printf("Vibe on\n");
+void soundAlarm() {
+    tone(2, frequency, duration);
+    alarmRised = true; 
 }
 
-void vibeOff() {
-  digitalWrite(VIBEPIN, LOW);
-  Serial.printf("Vibe off\n");
+void sendText() {
+  // TODO find how to send a text
 }
 
 // Function to connect and reconnect as necessary to the MQTT server.
