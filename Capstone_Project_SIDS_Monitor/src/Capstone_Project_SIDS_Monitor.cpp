@@ -143,15 +143,7 @@ void loop()
   if (timeAfterRock.isTimerReady() && findBreaths() < 5 && isCribRocking) {
    soundAlarm();
   }
-  //publish heartrate to cloud every 6 seconds
-  if((millis()-lastTime > 6000)) {
-    if (mqtt.Update()) {
-      mqttHeartRate.publish(heartRate);
-      Serial.printf("heart rate = %i\n",heartRate);
-    }
-    lastTime = millis();
-  }
-
+ 
 }
 
 void startDisplay()
@@ -268,6 +260,14 @@ int sampleHeartRate() {
       display.setCursor(0,0);
       display.printf("Heart Rate= %i",heartRate);
       display.display();
+       //publish heartrate to cloud every 6 seconds
+  if((millis()-lastTime > 6000)) {
+    if (mqtt.Update()) {
+      mqttHeartRate.publish(heartRate);
+      Serial.printf("heart rate = %i\n",heartRate);
+    }
+    lastTime = millis();
+  }
   delay(100); // allow the code to pause for a moment
   //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
   for (byte i = 25; i < 100; i++) {
