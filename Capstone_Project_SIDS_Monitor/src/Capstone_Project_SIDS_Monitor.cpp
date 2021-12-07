@@ -69,7 +69,7 @@ byte readLED = D7;       //Blinks with each data read
 
 unsigned int frequency = 396;
 unsigned long duration = 500;
-unsigned long last, lastTime, lastMin, current;
+unsigned long last, lastTime, lastMin, current,lastTimeSpo2,lastTimeHeartRate;
 
 bool alarmRised = false;
 bool isLowBreathRate = false;
@@ -172,8 +172,6 @@ void startSpo2()
     Serial.printf("MAX30105 was not found. Please check wiring/power.");
     while (1)
       delay(1000);
-
-
   }
 
 
@@ -207,6 +205,14 @@ void startSpo2()
       display.setCursor(0,0);
       display.printf("spo2= %i",spo2);
       display.display();
+       //publish sp02 to cloud every 30 seconds
+  if((millis()-lastTime > 30000)) {
+    if (mqtt.Update()) {
+      mqttSPO2.publish(spo2);
+      Serial.printf("SP02 = %i\n",spo2);
+    }
+    lastTimeSpo2 = millis();
+  }
 }
 
 void startWifi() {
@@ -256,18 +262,7 @@ int findBreaths() {
 
 int sampleHeartRate() {
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
-      display.clearDisplay();
-      display.setCursor(0,0);
-      display.printf("Heart Rate= %i",heartRate);
-      display.display();
-       //publish heartrate to cloud every 6 seconds
-  if((millis()-lastTime > 6000)) {
-    if (mqtt.Update()) {
-      mqttHeartRate.publish(heartRate);
-      Serial.printf("heart rate = %i\n",heartRate);
-    }
-    lastTime = millis();
-  }
+      
   delay(100); // allow the code to pause for a moment
   //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
   for (byte i = 25; i < 100; i++) {
@@ -294,6 +289,18 @@ int sampleHeartRate() {
   }
   //After gathering 25 new samples recalculate HR and SP02
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+  display.clearDisplay();
+      display.setCursor(0,0);
+      display.printf("Heart Rate= %i",heartRate);
+      display.display();
+       //publish heartrate to cloud every 6 seconds
+  if((millis()-lastTime > 6000)) {
+    if (mqtt.Update()) {
+      mqttHeartRate.publish(heartRate);
+      Serial.printf("heart rate = %i\n",heartRate);
+    }
+    lastTimeHeartRate = millis();
+  }
   return heartRate;
 }
 
