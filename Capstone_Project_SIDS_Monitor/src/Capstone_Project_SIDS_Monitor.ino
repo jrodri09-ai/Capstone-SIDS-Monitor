@@ -64,10 +64,15 @@ MAX30105 particleSensor;
 Adafruit_SSD1306 display(OLED_RESET);
 // Stepper Motor
 Stepper myStepper(stepsPerRevolution, A1, A3, A2, A4);
+
 // MQTT for dash board
 TCPClient TheClient;
 Adafruit_MQTT_SPARK mqtt(&TheClient, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
-Adafruit_MQTT_Publish mqttObjRes = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/resistance");
+
+Adafruit_MQTT_Publish mqttBreaths = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/breaths");
+Adafruit_MQTT_Publish mqttSPO2 = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/sp02");
+Adafruit_MQTT_Publish mqttHeartRate = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/heartrate");
+
 
 void setup()
 {
@@ -88,6 +93,7 @@ void loop()
   // Validate connected to MQTT Broker
   MQTT_connect();
   displayTime();
+  
 
   buttonpress = digitalRead(BUTTONPIN);
   if (buttonpress && alarmRised)
@@ -137,14 +143,17 @@ void setupPins()
   pinMode(readLED, OUTPUT);
 }
 
-void startSpo2()
+void startSpo2() 
 {
   if (!particleSensor.begin(Wire, I2C_SPEED_FAST)) //Use default I2C port, 400kHz speed
   {
     Serial.printf("MAX30105 was not found. Please check wiring/power.");
     while (1)
       delay(1000);
+
+
   }
+
 
   byte ledBrightness = 60; //Options: 0=Off to 255=50mA
   byte sampleAverage = 4;  //Options: 1, 2, 4, 8, 16, 32
@@ -172,6 +181,10 @@ void startSpo2()
 
   //calculate heart rate and SpO2 after first 100 samples (first 4 seconds of samples)
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
+      display.clearDisplay();
+      display.setCursor(0,0);
+      display.printf("spo2= %i",spo2);
+      display.display();
 }
 
 void startWifi() {
@@ -192,6 +205,7 @@ void displayTime() {
   display.setCursor(0, 0);            // Start at top-left corner
   display.setTextColor(BLACK, WHITE); // Draw 'inverse' text
   display.display();
+  
 }
 
 int findBreaths() {
@@ -206,8 +220,8 @@ int findBreaths() {
   //publish to cloud every 6 seconds
   if ((millis() - lastTime > 6000)) {
     if (mqtt.Update()) {
-      mqttObjRes.publish(breaths);
-      Serial.printf("Publishing %f\n", mqttObjRes);
+      mqttBreaths.publish(breaths);
+      Serial.printf("Publishing %f\n", mqttBreaths);
     }
     lastTime = millis();
   }
@@ -220,7 +234,10 @@ int findBreaths() {
 
 int sampleHeartRate() {
   //Continuously taking samples from MAX30102.  Heart rate and SpO2 are calculated every 1 second
-
+      display.clearDisplay();
+      display.setCursor(0,0);
+      display.printf("Heart Rate= %i",heartRate);
+      display.display();
   delay(100); // allow the code to pause for a moment
   //dumping the first 25 sets of samples in the memory and shift the last 75 sets of samples to the top
   for (byte i = 25; i < 100; i++) {
