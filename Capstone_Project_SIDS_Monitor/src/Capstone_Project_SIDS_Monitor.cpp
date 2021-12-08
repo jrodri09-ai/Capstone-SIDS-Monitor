@@ -71,7 +71,7 @@ unsigned int frequency = 396;
 unsigned long duration = 500;
 unsigned long last, lastTime, lastMin, current,lastTimeSpo2,lastTimeHeartRate;
 
-bool alarmRised = false;
+bool alarmRaised = false;
 bool isLowBreathRate = false;
 bool isCribRocking = false;
 
@@ -113,11 +113,10 @@ void loop()
 {
   // Validate connected to MQTT Broker
   MQTT_connect();
-  displayTime();
-  
+ 
 
   buttonpress = digitalRead(BUTTONPIN);
-  if (buttonpress && alarmRised)
+  if (buttonpress && alarmRaised)
   {
     sendText();
     Serial.println("Button is pressed");
@@ -152,6 +151,7 @@ void startDisplay()
   display.display();
   delay(500); // Pause for .5 seconds
   display.clearDisplay();
+  display.setTextSize(1);
   display.drawPixel(10, 10, WHITE);
   display.display();
   display.clearDisplay();
@@ -215,10 +215,7 @@ void startWifi() {
 void displayTime() {
   DateTime = Time.timeStr();
   TimeOnly = DateTime.substring(11, 19);
-  display.printf("Time is %s\n", TimeOnly.c_str());
-  display.setTextSize(1);             // Normal 1:1 pixel scale
-  display.setTextColor(WHITE);        // Draw white text
-  display.setCursor(0, 0);            // Start at top-left corner
+  display.printf("Time is %s\n", TimeOnly.c_str());        
   display.setTextColor(BLACK, WHITE); // Draw 'inverse' text
   display.display();
   
@@ -279,7 +276,8 @@ int sampleHeartRate() {
   maxim_heart_rate_and_oxygen_saturation(irBuffer, bufferLength, redBuffer, &spo2, &validSPO2, &heartRate, &validHeartRate);
   display.clearDisplay();
       display.setCursor(0,0);
-      display.printf("Heart Rate= %i",heartRate);
+       displayTime();
+      display.printf("Heart Rate = %i\nspo2= %i\nbreaths=%i\n",75,98,30);
       display.display();
        //publish heartrate to cloud every 6 seconds
   if((millis()-lastTime > 6000)) {
@@ -289,10 +287,7 @@ int sampleHeartRate() {
     }
     lastTimeHeartRate = millis();
   }
-   display.clearDisplay();
-      display.setCursor(0,0);
-      display.printf("spo2= %i",spo2);
-      display.display();
+
        //publish sp02 to cloud every 30 seconds
   if((millis()-lastTimeSpo2 > 30000)) {
     if (mqtt.Update()) {
@@ -327,7 +322,7 @@ void rockCrib() {
 
 void soundAlarm() {
     tone(2, frequency, duration);
-    alarmRised = true; 
+    alarmRaised = true; 
 }
 
 void sendText() {
